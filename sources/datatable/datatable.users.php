@@ -2,8 +2,8 @@
 /**
  * @file          users.queries.table.php
  * @author        Nils Laumaillé
- * @version       2.1.26
- * @copyright     (c) 2009-2016 Nils Laumaillé
+ * @version       2.1.27
+ * @copyright     (c) 2009-2017 Nils Laumaillé
  * @licensing     GNU AFFERO GPL 3.0
  * @link          http://www.teampass.net
  *
@@ -12,7 +12,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-require_once('../sessions.php');
+require_once('../SecureHandler.php');
 session_start();
 if (!isset($_SESSION['CPM']) || $_SESSION['CPM'] != 1) {
     die('Hacking attempt...');
@@ -89,7 +89,6 @@ if (isset($_GET['order'][0]['dir']) && in_array($_GET['order'][0]['dir'], $aSort
    * word by word on any field. It's possible to do here, but concerned about efficiency
    * on very large tables, and MySQL's regex functionality is very limited
 */
-$criteria = "";
 if (isset($_GET['letter']) && $_GET['letter'] != "" && $_GET['letter'] != "None") {
     if (empty($sWhere)) $sWhere = " WHERE ";
     $sWhere .= $aColumns[1]." LIKE '".filter_var($_GET['letter'], FILTER_SANITIZE_STRING)."%' OR ";
@@ -110,18 +109,18 @@ if (!$_SESSION['is_admin'] && !$_SESSION['user_can_manage_all_users']) {
     $sWhere .= "isAdministratedByRole IN (".implode(",", array_filter($_SESSION['user_roles'])).")";
 }
 
-DB::query("SELECT * FROM ".$pre."users");
+$rows = DB::query(
+    "SELECT * FROM ".$pre."users
+    $sWhere"
+);
 $iTotal = DB::count();
-//DB::debugMode(true);
+
 $rows = DB::query(
     "SELECT * FROM ".$pre."users
     $sWhere
-    $sLimit",
-    $criteria
+    $sLimit"
 );
-
-//$iFilteredTotal = DB::count();
-$iFilteredTotal = 0;
+$iFilteredTotal = DB::count();
 
 // output
 if (DB::count() > 0) {
@@ -182,7 +181,7 @@ foreach ($rows as $record) {
         $_SESSION['is_admin'] ||
         ($record['isAdministratedByRole'] > 0 &&
         in_array($record['isAdministratedByRole'], $_SESSION['user_roles'])) ||
-		($_SESSION['user_can_manage_all_users'] && $record['admin'] != 1)
+        ($_SESSION['user_can_manage_all_users'] && $record['admin'] != 1)
     ) {
         $showUserFolders = true;
     } else {
@@ -200,16 +199,33 @@ foreach ($rows as $record) {
 
         //col1
         if ($record['disabled'] == 1) {
-            $sOutput .= '"<i class=\"fa fa-user-times tip mi-red\" title=\"'.$LANG['account_is_locked'].'\"></i>&nbsp;';
+            $sOutput .= '"<span class=\"fa fa-user-times tip mi-red\" title=\"'.$LANG['account_is_locked'].'\"></span>&nbsp;';
         } else {
             $sOutput .= '"';
         }
-		if ($record['id'] != API_USER_ID)
-			$sOutput .= '<i class=\"fa fa-external-link tip\" style=\"cursor:pointer;\" onclick=\"user_edit(\''.$record['id'].'\')\" title=\"'.$LANG['edit'].' ['.$record['id'].']'.'\"></i>';
+        if ($record['id'] != API_USER_ID && $record['id'] != OTV_USER_ID)
+            $sOutput .= '<span class=\"fa fa-external-link tip\" style=\"cursor:pointer;\" onclick=\"user_edit(\''.$record['id'].'\')\" title=\"'.$LANG['edit'].' ['.$record['id'].']'.'\"></span>';
+
+        // pwd change
+        $sOutput .= '&nbsp;<span class=\"fa fa-key tip\" style=\"cursor:pointer;\" onclick=\"mdp_user(\''.$record['id'].'\')\" title=\"'.addcslashes($LANG['change_password'], '"\\/').'\"></span>';
+
+        // user logs
+        $sOutput .= '&nbsp;<span class=\"fa fa-newspaper-o tip\" onclick=\"user_action_log_items(\''.$record['id'].'\')\" style=\"cursor:pointer;\" title=\"'.addcslashes($LANG['see_logs'], '"\\/').'\"></span>';
+
+        // user flashcode sending
+        if (empty($record['ga'])) {
+            $sOutput .= '&nbsp;<span class=\"fa fa-qrcode mi-yellow tip\" style=\"cursor:pointer;\" onclick=\"user_action_ga_code(\''.$record['id'].'\')\" title=\"'.addcslashes($LANG['user_ga_code'], '"\\/').'\"></span>';
+        } else {
+            $sOutput .= '&nbsp;<span class=\"fa fa-qrcode mi-green tip\" style=\"cursor:pointer;\" onclick=\"user_action_ga_code(\''.$record['id'].'\')\" title=\"'.addcslashes($LANG['user_ga_code'], '"\\/').'\"></span>';
+        }
+
+        if ($record['admin'] !== "1")
+            $sOutput .= '&nbsp;<span class=\"fa fa-sitemap tip\" style=\"cursor:pointer;\" onclick=\"user_folders_rights(\''.$record['id'].'\')\" title=\"'.$LANG['user_folders_rights'].' ['.$record['id'].']'.'\"></span>';
+
         $sOutput .= '",';
 
         //col2
-        $sOutput .= '"'.$record['login'].'"';
+        $sOutput .= '"<input=\"hidden\" id=\"user_login_'.$record['id'].'\" value=\"'.$record['login'].'\">'.$record['login'].'"';
         $sOutput .= ',';
 
         //col3
@@ -238,23 +254,27 @@ foreach ($rows as $record) {
         $sOutput .= ',';
 
         //col9
-        if ($record['admin'] == 1) $sOutput .= '"<i class=\"fa fa-toggle-on mi-green\" style=\"cursor:pointer;\" tp=\"'.$record['id'].'-admin-0\"></i>"';
-        else $sOutput .= '"<i class=\"fa fa-toggle-off\" style=\"cursor:pointer;\" tp=\"'.$record['id'].'-admin-1\"></i>"';
+        if ($_SESSION['user_can_manage_all_users'] === "1" || $_SESSION['is_admin'] === "1") {
+            if ($record['admin'] === "1") $sOutput .= '"<i class=\"fa fa-toggle-on mi-green\" style=\"cursor:pointer;\" tp=\"'.$record['id'].'-admin-0\"></i>"';
+            else $sOutput .= '"<i class=\"fa fa-toggle-off\" style=\"cursor:pointer;\" tp=\"'.$record['id'].'-admin-1\"></i>"';
+        } else {
+            $sOutput .= '""';
+        }
         $sOutput .= ',';
 
         //col10
-        if ($record['gestionnaire'] == 1) $sOutput .= '"<i class=\"fa fa-toggle-on mi-green\" style=\"cursor:pointer;\"  tp=\"'.$record['id'].'-gestionnaire-0\"></i>"';
+        if ($record['gestionnaire'] === "1") $sOutput .= '"<i class=\"fa fa-toggle-on mi-green\" style=\"cursor:pointer;\"  tp=\"'.$record['id'].'-gestionnaire-0\"></i>"';
         else $sOutput .= '"<i class=\"fa fa-toggle-off\" style=\"cursor:pointer;\" tp=\"'.$record['id'].'-gestionnaire-1\"></i>"';
         $sOutput .= ',';
 
         //col11
-        if ($record['read_only'] == 1) $sOutput .= '"<i class=\"fa fa-toggle-on mi-green\" style=\"cursor:pointer;\" tp=\"'.$record['id'].'-read_only-0\"></i>"';
+        if ($record['read_only'] === "1") $sOutput .= '"<i class=\"fa fa-toggle-on mi-green\" style=\"cursor:pointer;\" tp=\"'.$record['id'].'-read_only-0\"></i>"';
         else $sOutput .= '"<i class=\"fa fa-toggle-off\" style=\"cursor:pointer;\" tp=\"'.$record['id'].'-read_only-1\"></i>"';
         $sOutput .= ',';
 
         //col11
-        if ($_SESSION['is_admin'] == 1 || $_SESSION['user_can_manage_all_users'] == 1) {
-            if ($record['can_manage_all_users'] == 1) {
+        if ($_SESSION['is_admin'] === "1" || $_SESSION['user_can_manage_all_users'] == 1) {
+            if ($record['can_manage_all_users'] === "1") {
                 $sOutput .= '"<i class=\"fa fa-toggle-on mi-green\" style=\"cursor:pointer;\" tp=\"' . $record['id'] . '-can_manage_all_users-0\"></i>"';
             } else {
                 $sOutput .= '"<i class=\"fa fa-toggle-off\" style=\"cursor:pointer;\" tp=\"' . $record['id'] . '-can_manage_all_users-1\"></i>"';
@@ -265,28 +285,13 @@ foreach ($rows as $record) {
         $sOutput .= ',';
 
         //col12
-        if ($record['can_create_root_folder'] == 1) $sOutput .= '"<i class=\"fa fa-toggle-on mi-green\" style=\"cursor:pointer;\" tp=\"'.$record['id'].'-can_create_root_folder-0\"></i>"';
+        if ($record['can_create_root_folder'] === "1") $sOutput .= '"<i class=\"fa fa-toggle-on mi-green\" style=\"cursor:pointer;\" tp=\"'.$record['id'].'-can_create_root_folder-0\"></i>"';
         else $sOutput .= '"<i class=\"fa fa-toggle-off\" style=\"cursor:pointer;\" tp=\"'.$record['id'].'-can_create_root_folder-1\"></i>"';
         $sOutput .= ',';
 
         //col13
-        if ($record['personal_folder'] == 1) $sOutput .= '"<i class=\"fa fa-toggle-on mi-green\" style=\"cursor:pointer;\" tp=\"'.$record['id'].'-personal_folder-0\"></i>"';
+        if ($record['personal_folder'] === "1") $sOutput .= '"<i class=\"fa fa-toggle-on mi-green\" style=\"cursor:pointer;\" tp=\"'.$record['id'].'-personal_folder-0\"></i>"';
         else $sOutput .= '"<i class=\"fa fa-toggle-off\" style=\"cursor:pointer;\" tp=\"'.$record['id'].'-personal_folder-1\"></i>"';
-        $sOutput .= ',';
-
-        //col15
-        $sOutput .= '"<i class=\"fa fa-key tip\" style=\"cursor:pointer;\" onclick=\"mdp_user(\''.$record['id'].'\')\" title=\"'.addcslashes($LANG['change_password'], '"\\/').'\"></i>"';
-        $sOutput .= ',';
-
-        //col16
-        $sOutput .= '"<i class=\"fa fa-newspaper-o tip\" onclick=\"user_action_log_items(\''.$record['id'].'\')\" style=\"cursor:pointer;\" title=\"'.addcslashes($LANG['see_logs'], '"\\/').'\"></i>"';
-        $sOutput .= ',';
-
-        //col15
-        if (empty($record['ga']))
-            $sOutput .= '"<i class=\"fa fa-qrcode mi-yellow tip\" style=\"cursor:pointer;\" onclick=\"user_action_ga_code(\''.$record['id'].'\')\" title=\"'.addcslashes($LANG['user_ga_code'], '"\\/').'\"></i>"';
-        else
-            $sOutput .= '"<i class=\"fa fa-qrcode mi-green tip\" style=\"cursor:pointer;\" onclick=\"user_action_ga_code(\''.$record['id'].'\')\" title=\"'.addcslashes($LANG['user_ga_code'], '"\\/').'\"></i>"';
 
 
         //Finish the line
@@ -305,4 +310,4 @@ if (count($rows) > 0) {
 
 // prepare complete output
 
-echo '{"recordsTotal": '.$iTotal.', "recordsFiltered": '.$iTotal.', "data": '.$sOutput;
+echo '{"recordsTotal": '.$iTotal.', "recordsFiltered": '.$iFilteredTotal.', "data": '.$sOutput;

@@ -2,8 +2,8 @@
 /**
  * @file          admin.settings.load.php
  * @author        Nils Laumaillé
- * @version       2.1.26
- * @copyright     (c) 2009-2016 Nils Laumaillé
+ * @version       2.1.27
+ * @copyright     (c) 2009-2017 Nils Laumaillé
  * @licensing     GNU AFFERO GPL 3.0
  * @link          http://www.teampass.net
  *
@@ -33,9 +33,10 @@ function catInFolders(id) {
     $("#post_id").val(id);
     $("#catInFolder_title").html($("#item_"+id).html());    // display title
     // pre-select folders
+    $("#cat_folders_selection > option").prop("selected", false);
     var folder = $("#catFoldersList_"+id).val().split(";");
     for (var i=0; i<folder.length; i++) {
-        $("#cat_folders_selection option[value="+folder[0]+"]").attr('selected', true);
+        $("#cat_folders_selection option[value="+folder[i]+"]").attr('selected', 'selected');
     };
     // open
     $("#category_in_folder").dialog("open");
@@ -173,7 +174,7 @@ function loadFieldsList() {
             // parse json table and disaply
             var json = $.parseJSON(data);
             $(json).each(function(i,val){
-                if (val[0] == 1) {
+                if (val[0] === "1") {
                     newList += '<tr id="t_cat_'+val[1]+'"><td colspan="2">'+
                     '<input type="text" id="catOrd_'+val[1]+'" size="1" class="category_order" value="'+val[3]+'" />&nbsp;'+
                     '<span class="fa-stack tip" title="<?php echo $LANG['field_add_in_category'];?>" onclick="fieldAdd('+
@@ -193,8 +194,19 @@ function loadFieldsList() {
                     newList += '<tr id="t_field_'+val[1]+'"><td width="20px"></td>'+
                     '<td><input type="text" id="catOrd_'+val[1]+'" size="1" class="category_order" value="'+val[3]+'" />&nbsp;'+
                     '<input type="radio" name="sel_item" id="item_'+val[1]+'_cat" />'+
-                    '<label for="item_'+val[1]+'_cat" id="item_'+val[1]+'">'+val[2]+'</label>'+
-                    '</td><td></td></tr>';
+                    '<label for="item_'+val[1]+'_cat" id="item_'+val[1]+'">'+val[2]+'</label>';
+
+                    if (val[4] !== "") {
+                        newList += '<span id="encryt_data_'+val[1]+'" style="margin-left:4px; cursor:pointer;">';
+                        if (val[4] === "1") {
+                            newList += '<i class="fa fa-key tip" title="<?php echo $LANG['encrypted_data'];?>" onclick="changeEncrypMode('+val[1]+', 1)"></i>';
+                        } else if (val[4] === "0") {
+                            newList += '<span class="fa-stack" title="<?php echo $LANG['not_encrypted_data'];?>" onclick="changeEncrypMode('+val[1]+', 0)"><i class="fa fa-key fa-stack-1x"></i><i class="fa fa-ban fa-stack-1x fa-lg" style="color:red;"></i></span>';
+                        }
+                        newList += '</span>'
+                    }
+
+                    newList += '</td><td></td></tr>';
                 }
             });
 
@@ -205,16 +217,6 @@ function loadFieldsList() {
             $("#div_loading").hide();
         }
    );
-}
-
-function changeSettingStatus(id, val) {
-    if (val == 1) {
-        $("#flag_"+id).html("<img src='includes/images/status.png' />");
-        $("#"+id+"_radio2").addClass("ui-button.redButton");
-        console.log(("#"+id+"_radio2"));
-    } else {
-        $("#flag_"+id).html("<img src='includes/images/status-busy.png' />");
-    }
 }
 
 //###########
@@ -246,24 +248,24 @@ function LaunchAdminActions(action,option)
             $("#div_loading").hide();
             if (data != null) {
                 if (data[0].result == "db_backup") {
-                    $("#result_admin_action_db_backup").html("<img src='includes/images/document-code.png' alt='' />&nbsp;<a href='"+data[0].href+"'><?php echo $LANG['pdf_download'];?></a>").show();
+                    $("#result_admin_action_db_backup").html("<span class='fa fa-file-code-o'></span>&nbsp;<a href='"+data[0].href+"'><?php echo $LANG['pdf_download'];?></a>").show();
                 } else if (data[0].result == "pf_done") {
-                    $("#result_admin_action_check_pf").html("<img src='includes/images/tick.png' alt='' />").show();
+                    $("#result_admin_action_check_pf").html("<span class='fa fa-check mi-green'></span>").show();
                 } else if (data[0].result == "db_restore") {
                     $("#restore_bck_encryption_key_dialog").dialog("close");
-                    $("#result_admin_action_db_restore").html("<img src='includes/images/tick.png' alt='' />").show();
+                    $("#result_admin_action_db_restore").html("<span class='fa fa-check mi-green'></span>").show();
                     $("#result_admin_action_db_restore_get_file").hide();
                     //deconnect userd
                     sessionStorage.clear();
                     window.location.href = "logout.php"
                 } else if (data[0].result == "cache_reload") {
-                    $("#result_admin_action_reload_cache_table").html("<img src='includes/images/tick.png' alt='' />").show();
+                    $("#result_admin_action_reload_cache_table").html("<span class='fa fa-check mi-green'></span>").show();
                 } else if (data[0].result == "db_optimize") {
-                    $("#result_admin_action_db_optimize").html("<img src='includes/images/tick.png' alt='' />").show();
+                    $("#result_admin_action_db_optimize").html("<span class='fa fa-check mi-green'></span>").show();
                 } else if (data[0].result == "purge_old_files") {
-                    $("#result_admin_action_purge_old_files").html("<img src='includes/images/tick.png' alt='' />&nbsp;"+data[0].nb_files_deleted+"&nbsp;<? echo $LANG['admin_action_purge_old_files_result'];?>").show();
+                    $("#result_admin_action_purge_old_files").html("<span class='fa fa-check mi-green'></span>&nbsp;"+data[0].nb_files_deleted+"&nbsp;<? echo $LANG['admin_action_purge_old_files_result'];?>").show();
                 } else if (data[0].result == "db_clean_items") {
-                    $("#result_admin_action_db_clean_items").html("<img src='includes/images/tick.png' alt='' />&nbsp;"+data[0].nb_items_deleted+"&nbsp;<?php echo $LANG['admin_action_db_clean_items_result'];?>").show();
+                    $("#result_admin_action_db_clean_items").html("<span class='fa fa-check mi-green'></span>&nbsp;"+data[0].nb_items_deleted+"&nbsp;<?php echo $LANG['admin_action_db_clean_items_result'];?>").show();
                 } else if (data[0].result == "changed_salt_key") {
                     //deconnect user
                     $("#menu_action").val("deconnexion");
@@ -286,7 +288,7 @@ function LaunchAdminActions(action,option)
                         $("#result_admin_action_attachments_cryption").html("It seems the files are encrypted. Are you sure you want to encrypt? please do a check.").show();
                     }
                 } else if (data[0].result == "rebuild_config_file") {
-                    $("#result_admin_rebuild_config_file").html("<img src='includes/images/tick.png' alt='' />").show();
+                    $("#result_admin_rebuild_config_file").html("<span class='fa fa-check mi-green'></span>").show();
                 }
             }
         },
@@ -297,27 +299,23 @@ function LaunchAdminActions(action,option)
 /*
 *
 */
-function changeMainSaltKey(start)
+function confirmChangingSk() {
+    if (confirm("Please confirm")) {
+        changeMainSaltKey('starting', '');
+    }
+}
+
+/*
+*
+*/
+function changeMainSaltKey(start, type)
 {
     var nb = 10;    // can be changed - number of items treated in each loop
-
-    // check saltkey length
-    if ($("#new_salt_key").val().length != 16) {
-        $("#changeMainSaltKey_message").html("<i class=\"fa fa-alert fa-spin fa\"></i>&nbsp;<?php echo $LANG['error_saltkey_length'];?>");
-        return false;
-    }
-
-    // prepare excahnge
-    var newSK = prepareExchangedData(
-        '{"newSK":"'+sanitizeString($("#new_salt_key").val())+'"}',
-        "encode",
-        "<?php echo $_SESSION['key'];?>"
-    );
 
     //console.log("Start value: "+start);
 
     // start change
-    if (start == "starting") {
+    if (start === "starting") {
         // inform
         $("#changeMainSaltKey_message").html("<i class=\"fa fa-cog fa-spin fa\"></i>&nbsp;<?php echo $LANG['starting'];?>");
 
@@ -325,8 +323,7 @@ function changeMainSaltKey(start)
         $.post(
             "sources/admin.queries.php",
             {
-               type     : "admin_action_change_salt_key___start",
-               newSK    : newSK
+               type     : "admin_action_change_salt_key___start"
             },
             function(data) {
                 //console.log("Step start - " + data[0].nextAction);
@@ -334,7 +331,7 @@ function changeMainSaltKey(start)
                     $("#changeMainSaltKey_itemsCount").val(data[0].nbOfItems);
                     //console.log("Now launch encryption");
                     // start encrypting items with new saltkey
-                    changeMainSaltKey(0);
+                    changeMainSaltKey(0, "items");
                 } else {
                     // error mngt
                     $("#changeMainSaltKey_message").html("<i class=\"fa fa-alert fa-spin fa\"></i>&nbsp;<?php echo $LANG['error_sent_back'];?> : "+data[0].error);
@@ -342,26 +339,24 @@ function changeMainSaltKey(start)
             },
             "json"
         );
-    }
-    else if (isFinite(start)) {
-        //console.log("Step Encrypt - " + newSK+" ; "+start+" ; "+nb+" ; "+$("#changeMainSaltKey_itemsCount").val());
+    } else if (isFinite(start) && type === "items") {
+        console.log("Step Encrypt - " +start+" ; "+nb+" ; "+$("#changeMainSaltKey_itemsCount").val());
 
         $("#changeMainSaltKey_message").html("<i class=\"fa fa-cog fa-spin fa\"></i>&nbsp;<?php echo $LANG['treating_items'];?>...&nbsp;"+start+" > "+(parseInt(start)+parseInt(nb))+" (<?php echo $LANG['total_number_of_items'];?> : "+$("#changeMainSaltKey_itemsCount").val()+")");
 
         $.post(
             "sources/admin.queries.php",
             {
-               type     : "admin_action_change_salt_key___encrypt",
-               newSK    : newSK,
+               type     : "admin_action_change_salt_key___encrypt_files",
                start    : start,
                length    : nb,
                nbItems    : $("#changeMainSaltKey_itemsCount").val()
             },
             function(data) {
                 console.log("Next action: "+data[0].nextAction);
-                if (data[0].nextAction == "encrypting") {
-                    changeMainSaltKey(data[0].nextStart);
-                } else if (data[0].nextAction == "finishing") {
+                if (data[0].nextAction === "encrypting") {
+                    changeMainSaltKey(data[0].nextStart, "items");
+                } else if (data[0].nextAction === "finishing") {
                     $("#changeMainSaltKey_message").html("<?php echo $LANG['finalizing'];?>...");
                     changeMainSaltKey("finishing");
                 } else {
@@ -371,19 +366,35 @@ function changeMainSaltKey(start)
             },
             "json"
         );
-    }
-    else {
-        console.log("finishing");
+    } else if (isFinite(start) && type == "logs") {
+        $("#changeMainSaltKey_message").html("<i class=\"fa fa-cog fa-spin fa\"></i>&nbsp;<?php echo $LANG['treating_items'];?>...&nbsp;"+start+" > "+(parseInt(start)+parseInt(nb))+" (<?php echo $LANG['total_number_of_items'];?> : "+$("#changeMainSaltKey_itemsCount").val()+")");
+
+        changeMainSaltKey(0, "files");
+
+    } else if (isFinite(start) && type == "files") {
+        $("#changeMainSaltKey_message").html("<i class=\"fa fa-cog fa-spin fa\"></i>&nbsp;<?php echo $LANG['treating_items'];?>...&nbsp;"+start+" > "+(parseInt(start)+parseInt(nb))+" (<?php echo $LANG['total_number_of_items'];?> : "+$("#changeMainSaltKey_itemsCount").val()+")");
+
+        changeMainSaltKey(0, "categories");
+
+    } else if (isFinite(start) && type == "categories") {
+        $("#changeMainSaltKey_message").html("<i class=\"fa fa-cog fa-spin fa\"></i>&nbsp;<?php echo $LANG['treating_items'];?>...&nbsp;"+start+" > "+(parseInt(start)+parseInt(nb))+" (<?php echo $LANG['total_number_of_items'];?> : "+$("#changeMainSaltKey_itemsCount").val()+")");
+
+        changeMainSaltKey(0, "custfields");
+
+    } else if (isFinite(start) && type == "custfields") {
+        $("#changeMainSaltKey_message").html("<i class=\"fa fa-cog fa-spin fa\"></i>&nbsp;<?php echo $LANG['treating_items'];?>...&nbsp;"+start+" > "+(parseInt(start)+parseInt(nb))+" (<?php echo $LANG['total_number_of_items'];?> : "+$("#changeMainSaltKey_itemsCount").val()+")");
+
+        changeMainSaltKey("finishing");
+    } else {
         $.post(
             "sources/admin.queries.php",
             {
-               type     : "admin_action_change_salt_key___end",
-               newSK    : newSK
+               type     : "admin_action_change_salt_key___end"
             },
             function(data) {
-                if (data[0].nextAction == "done") {
+                if (data[0].nextAction === "done") {
                     console.log("done");
-                    $("#changeMainSaltKey_message").html("<i class=\"fa fa-info fa-spin fa\"></i>&nbsp;<?php echo $LANG['finalizing'];?> <?php echo $LANG['number_of_items_treated'];?> : "+$("#changeMainSaltKey_itemsCount").val());
+                    $("#changeMainSaltKey_message").html("<i class=\"fa fa-info fa-lg\"></i>&nbsp;<?php echo $LANG['alert_message_done']." ".$LANG['number_of_items_treated'];?> : "+$("#changeMainSaltKey_itemsCount").val());
                 } else {
                     // error mngt
                 }
@@ -636,13 +647,23 @@ $(function() {
         }
     });
 
+    $("#cat_folders_selection").multiselect({
+        selectedList: 7,
+        multiple:true,
+        checkAllText: "<?php echo $LANG['check_all_text'];?>",
+        uncheckAllText: "<?php echo $LANG['uncheck_all_text'];?>"
+    });
+
     $("#category_in_folder").dialog({
         bgiframe: true,
         modal: true,
         autoOpen: false,
-        width: 300,
+        width: 400,
         height: 350,
         title: "<?php echo $LANG['category_in_folders'];?>",
+        open: function() {
+            $("#cat_folders_selection").multiselect('refresh');
+        },
         buttons: {
             "<?php echo $LANG['confirm'];?>": function() {
                 // get list of selected folders
@@ -840,12 +861,40 @@ function manageEncryptionOfAttachments(list, cpt) {
 function refreshInput()
 {
     var ids = "";
-    $.each($("#roles_allowed_to_print_select option:selected"), function(){  
+    $.each($("#roles_allowed_to_print_select option:selected"), function(){
         if (ids == "") ids = $(this).val();
         else ids = ids + ";" + $(this).val();
     });
     $("#roles_allowed_to_print").val(ids);
     updateSetting('roles_allowed_to_print');
+}
+
+function changeEncrypMode(id, encrypted_data) {
+    // send to server
+    $("#div_loading").show();
+    //send query
+    $.post(
+        "sources/categories.queries.php",
+        {
+            type    : "dataIsEncryptedInDB",
+            id      : id,
+            encrypt : encrypted_data === "1" ? "0" : "1"
+        },
+        function(data) {
+            // show to user
+            if (data[0].error === ""){
+                if (encrypted_data === "1") {
+                    $("#encryt_data_"+id).html('<span class="fa-stack" title="<?php echo $LANG['not_encrypted_data'];?>" onclick="changeEncrypMode(\''+id+'\', \'0\')"><i class="fa fa-key fa-stack-1x"></i><i class="fa fa-ban fa-stack-1x fa-lg" style="color:red;"></i></span>');
+                } else {
+                    $("#encryt_data_"+id).html('<i class="fa fa-key tip" title="<?php echo $LANG['encrypted_data'];?>" onclick="changeEncrypMode(\''+id+'\', \'1\')"></i>');
+                }
+            }
+            $("#div_loading").hide();
+        },
+        "json"
+   );
+
+
 }
 //]]>
 </script>

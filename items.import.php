@@ -3,8 +3,8 @@
  *
  * @file          items.import.php
  * @author        Nils Laumaillé
- * @version       2.1.26
- * @copyright     (c) 2009-2016 Nils Laumaillé
+ * @version       2.1.27
+ * @copyright     (c) 2009-2017 Nils Laumaillé
  * @licensing     GNU AFFERO GPL 3.0
  * @link          http://www.teampass.net
  *
@@ -13,7 +13,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-require_once('./sources/sessions.php');
+require_once('./sources/SecureHandler.php');
 session_start();
 if (
     (!isset($_SESSION['CPM']) || $_SESSION['CPM'] != 1 ||
@@ -57,7 +57,7 @@ $link = mysqli_connect($server, $user, $pass, $database, $port);
 $link->set_charset($encoding);
 
 echo '
-<input type="hidden" id="folder_id_selected" value="', isset($_GET["folder_id"]) ? $_GET["folder_id"] : '', '" />
+<input type="hidden" id="folder_id_selected" value="', isset($_GET["folder_id"]) ? filter_var($_GET["folder_id"], FILTER_SANITIZE_NUMBER_INT) : '', '" />
 <input type="hidden" id="import_user_token" value="" />
 <div id="import_tabs">
     <ul>
@@ -67,14 +67,14 @@ echo '
     <!-- TAB1 -->
     <div id="tabs-1">
         <!-- show some info -->
-		<div class="ui-state-highlight ui-corner-all" style="padding:10px;" id="csv_import_info">
-			<table border="0">
-				<tr>
-				<td valign="center"><span class="fa fa-info-circle fa-2x"></span>&nbsp;</td>
-				<td>'.$LANG['csv_import_information'].'</td>
-				</tr>
-			</table>
-		</div>
+        <div class="ui-state-highlight ui-corner-all" style="padding:10px;" id="csv_import_info">
+            <table border="0">
+                <tr>
+                <td valign="center"><span class="fa fa-info-circle fa-2x"></span>&nbsp;</td>
+                <td>'.$LANG['csv_import_information'].'</td>
+                </tr>
+            </table>
+        </div>
         <!-- show input file -->
         <div id="upload_container_csv">
             <div id="filelist_csv"></div><br />
@@ -119,8 +119,11 @@ foreach ($folders as $t) {
         for ($x=1; $x<$t->nlevel; $x++) {
             $ident .= "&nbsp;&nbsp;";
         }
-        if (isset($_GET['folder_id']) && $_GET['folder_id'] == $t->id) $selected = " selected";
-        else $selected = "";
+        if (isset($_GET['folder_id']) && filter_var($_GET['folder_id'], FILTER_SANITIZE_NUMBER_INT) == $t->id) {
+            $selected = " selected";
+        }else {
+            $selected = "";
+        }
         if ($prevLevel < $t->nlevel) {
             echo '<option value="'.$t->id.'"'.$selected.'>'.$ident.$t->title.'</option>';
         } elseif ($prevLevel == $t->nlevel) {
@@ -213,7 +216,7 @@ foreach ($folders as $t) {
                 UploadComplete: function(up, files) {
                     $.each(files, function(i, file) {
                         ImportCSV(file.name);
-                        up.splice();	// clear the file queue
+                        up.splice();    // clear the file queue
                     });
                 }
             }
@@ -229,7 +232,7 @@ foreach ($folders as $t) {
                 (err.file ? ", File: " + err.file.name : "") +
                 "</div>"
             );
-            up.splice();	// Clear the file queue
+            up.splice();    // Clear the file queue
             up.refresh(); // Reposition Flash/Silverlight
         });
         uploader_csv.bind("+", function(up, file) {
@@ -295,7 +298,7 @@ foreach ($folders as $t) {
                 },
                 UploadComplete: function(up, files) {
                     ImportKEEPASS(files[0].name);
-                    up.splice();		// clear the file queue
+                    up.splice();        // clear the file queue
                 }
             }
         });
@@ -309,7 +312,7 @@ foreach ($folders as $t) {
                 (err.file ? ", File: " + err.file.name : "") +
                 "</div>"
             );
-            up.splice();	// clear the file queue
+            up.splice();    // clear the file queue
             up.refresh(); // Reposition Flash/Silverlight
         });
         uploader_kp.bind("+", function(up, file) {

@@ -3,8 +3,8 @@
  *
  * @file          logout.php
  * @author        Nils Laumaillé
- * @version       2.1.26
- * @copyright     (c) 2009-2016 Nils Laumaillé
+ * @version       2.1.27
+ * @copyright     (c) 2009-2017 Nils Laumaillé
  * @licensing     GNU AFFERO GPL 3.0
  * @link          http://www.teampass.net
  *
@@ -12,8 +12,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  */
-
-session_start();
 
 // Update table by deleting ID
 if (isset($_SESSION['user_id']) && !empty($_SESSION['user_id'])) {
@@ -35,8 +33,5 @@ if (isset($_SESSION['user_id']) && !empty($_SESSION['user_id'])) {
 
 // erase session table
 $_SESSION = array();
-
-// Kill session
-session_destroy();
 
 header("Location: index.php");
